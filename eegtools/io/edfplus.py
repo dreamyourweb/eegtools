@@ -17,7 +17,7 @@ from collections import namedtuple
 EVENT_CHANNEL = 'EDF Annotations'
 log = logging.getLogger(__name__)
 
-class EDFEndOfData: pass
+class EDFEndOfData(BaseException): pass
 
 
 def tal(tal_str):
@@ -30,7 +30,7 @@ def tal(tal_str):
     '(?:\x14\x00)'
 
   def annotation_to_list(annotation):
-    return unicode(annotation, 'utf-8').split('\x14') if annotation else []
+    return annotation.split('\x14') if annotation else []
 
   def parse(dic):
     return (
@@ -38,44 +38,44 @@ def tal(tal_str):
       float(dic['duration']) if dic['duration'] else 0.,
       annotation_to_list(dic['annotation']))
 
-  return [parse(m.groupdict()) for m in re.finditer(exp, tal_str)]
+  return [parse(m.groupdict()) for m in re.finditer(exp, tal_str.decode('utf-8'))]
 
 
 def edf_header(f):
   h = {}
   assert f.tell() == 0  # check file position
-  assert f.read(8) == '0       '
+  assert f.read(8).decode('utf-8') == '0       '
 
   # recording info)
-  h['local_subject_id'] = f.read(80).strip()
-  h['local_recording_id'] = f.read(80).strip()
+  h['local_subject_id'] = f.read(80).decode('utf-8').strip()
+  h['local_recording_id'] = f.read(80).decode('utf-8').strip()
 
   # parse timestamp
-  (day, month, year) = [int(x) for x in re.findall('(\d+)', f.read(8))]
-  (hour, minute, sec)= [int(x) for x in re.findall('(\d+)', f.read(8))]
+  (day, month, year) = [int(x) for x in re.findall('(\d+)', f.read(8).decode('utf-8'))]
+  (hour, minute, sec)= [int(x) for x in re.findall('(\d+)', f.read(8).decode('utf-8'))]
   h['date_time'] = str(datetime.datetime(year + 2000, month, day, 
     hour, minute, sec))
 
   # misc
-  header_nbytes = int(f.read(8))
-  subtype = f.read(44)[:5]
+  header_nbytes = int(f.read(8).decode('utf-8'))
+  subtype = f.read(44).decode('utf-8')[:5]
   h['EDF+'] = subtype in ['EDF+C', 'EDF+D']
   h['contiguous'] = subtype != 'EDF+D'
-  h['n_records'] = int(f.read(8))
-  h['record_length'] = float(f.read(8))  # in seconds
-  nchannels = h['n_channels'] = int(f.read(4))
+  h['n_records'] = int(f.read(8).decode('utf-8'))
+  h['record_length'] = float(f.read(8).decode('utf-8'))  # in seconds
+  nchannels = h['n_channels'] = int(f.read(4).decode('utf-8'))
 
   # read channel info
   channels = range(h['n_channels'])
-  h['label'] = [f.read(16).strip() for n in channels]
-  h['transducer_type'] = [f.read(80).strip() for n in channels]
-  h['units'] = [f.read(8).strip() for n in channels]
-  h['physical_min'] = np.asarray([float(f.read(8)) for n in channels])
-  h['physical_max'] = np.asarray([float(f.read(8)) for n in channels])
-  h['digital_min'] = np.asarray([float(f.read(8)) for n in channels])
-  h['digital_max'] = np.asarray([float(f.read(8)) for n in channels])
-  h['prefiltering'] = [f.read(80).strip() for n in channels]
-  h['n_samples_per_record'] = [int(f.read(8)) for n in channels]
+  h['label'] = [f.read(16).decode('utf-8').strip() for n in channels]
+  h['transducer_type'] = [f.read(80).decode('utf-8').strip() for n in channels]
+  h['units'] = [f.read(8).decode('utf-8').strip() for n in channels]
+  h['physical_min'] = np.asarray([float(f.read(8).decode('utf-8')) for n in channels])
+  h['physical_max'] = np.asarray([float(f.read(8).decode('utf-8')) for n in channels])
+  h['digital_min'] = np.asarray([float(f.read(8).decode('utf-8')) for n in channels])
+  h['digital_max'] = np.asarray([float(f.read(8).decode('utf-8')) for n in channels])
+  h['prefiltering'] = [f.read(80).decode('utf-8').strip() for n in channels]
+  h['n_samples_per_record'] = [int(f.read(8).decode('utf-8')) for n in channels]
   f.read(32 * nchannels)  # reserved
   
   assert f.tell() == header_nbytes
